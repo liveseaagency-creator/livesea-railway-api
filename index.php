@@ -42,11 +42,40 @@ function require_api_key(): void
     }
 }
 
-$action = $_GET['action'] ?? 'ping';
+function config_payload(): array
+{
+    return [
+        'APP_ENV' => (string) env_value('APP_ENV', 'production'),
+        'APP_DEBUG' => (string) env_value('APP_DEBUG', 'false'),
 
-if ($action !== 'ping') {
-    require_api_key();
+        'DB_HOST' => (string) env_value('DB_HOST'),
+        'DB_PORT' => (string) env_value('DB_PORT', '3306'),
+        'DB_NAME' => (string) env_value('DB_NAME'),
+        'DB_USER' => (string) env_value('DB_USER'),
+        'DB_PASS' => (string) env_value('DB_PASS'),
+
+        'DISCORD_CLIENT_ID' => (string) env_value('DISCORD_CLIENT_ID'),
+        'DISCORD_CLIENT_SECRET' => (string) env_value('DISCORD_CLIENT_SECRET'),
+        'DISCORD_REDIRECT_URI' => (string) env_value('DISCORD_REDIRECT_URI'),
+        'DISCORD_BOT_TOKEN' => (string) env_value('DISCORD_BOT_TOKEN'),
+        'DISCORD_GUILD_ID' => (string) env_value('DISCORD_GUILD_ID'),
+        'DISCORD_REQUIRED_ROLE_ID' => (string) env_value('DISCORD_REQUIRED_ROLE_ID'),
+
+        'TIKMV_USER_LOOKUP_URL' => (string) env_value('TIKMV_USER_LOOKUP_URL', 'https://www.tikwm.com/api/user/info?unique_id=@%s'),
+        'TIKMV_HTTP_TIMEOUT' => (string) env_value('TIKMV_HTTP_TIMEOUT', '20'),
+
+        'SITE_NAME' => (string) env_value('SITE_NAME', 'LiveSea Agency'),
+        'SITE_SUPPORT_EMAIL' => (string) env_value('SITE_SUPPORT_EMAIL', 'contact@livesea-agency.fr'),
+        'SITE_DEFAULT_MANAGER_NAME' => (string) env_value('SITE_DEFAULT_MANAGER_NAME', 'Équipe LiveSea'),
+        'SITE_DEFAULT_MANAGER_EMAIL' => (string) env_value('SITE_DEFAULT_MANAGER_EMAIL', 'contact@livesea-agency.fr'),
+        'SITE_DEFAULT_MANAGER_DISCORD' => (string) env_value('SITE_DEFAULT_MANAGER_DISCORD', '@livesea.support'),
+        'SITE_DEFAULT_SUPPORT_DELAY' => (string) env_value('SITE_DEFAULT_SUPPORT_DELAY', 'Réponse sous 24h à 48h'),
+        'SITE_DEFAULT_AGENCY_ROLE' => (string) env_value('SITE_DEFAULT_AGENCY_ROLE', 'Créateur TikTok LIVE'),
+        'SITE_AGENCY_TIKTOK_URL' => (string) env_value('SITE_AGENCY_TIKTOK_URL', 'https://www.tiktok.com/t/ZMhfUEPPT/')
+    ];
 }
+
+$action = $_GET['action'] ?? 'ping';
 
 switch ($action) {
     case 'ping':
@@ -58,39 +87,45 @@ switch ($action) {
         ]);
         break;
 
-    case 'site-info':
+    case 'config':
+        require_api_key();
         json_response([
             'ok' => true,
-            'site_name' => env_value('SITE_NAME'),
-            'site_support_email' => env_value('SITE_SUPPORT_EMAIL'),
-            'site_default_manager_name' => env_value('SITE_DEFAULT_MANAGER_NAME'),
-            'site_default_manager_email' => env_value('SITE_DEFAULT_MANAGER_EMAIL'),
-            'site_default_manager_discord' => env_value('SITE_DEFAULT_MANAGER_DISCORD'),
-            'site_default_support_delay' => env_value('SITE_DEFAULT_SUPPORT_DELAY'),
-            'site_default_agency_role' => env_value('SITE_DEFAULT_AGENCY_ROLE'),
-            'site_agency_tiktok_url' => env_value('SITE_AGENCY_TIKTOK_URL'),
-            'discord_client_id' => env_value('DISCORD_CLIENT_ID'),
-            'discord_guild_id' => env_value('DISCORD_GUILD_ID'),
-            'discord_required_role_id' => env_value('DISCORD_REQUIRED_ROLE_ID'),
+            'config' => config_payload(),
+        ]);
+        break;
+
+    case 'site-info':
+        require_api_key();
+        $config = config_payload();
+
+        json_response([
+            'ok' => true,
+            'site_name' => $config['SITE_NAME'],
+            'site_support_email' => $config['SITE_SUPPORT_EMAIL'],
+            'site_default_manager_name' => $config['SITE_DEFAULT_MANAGER_NAME'],
+            'site_default_manager_email' => $config['SITE_DEFAULT_MANAGER_EMAIL'],
+            'site_default_manager_discord' => $config['SITE_DEFAULT_MANAGER_DISCORD'],
+            'site_default_support_delay' => $config['SITE_DEFAULT_SUPPORT_DELAY'],
+            'site_default_agency_role' => $config['SITE_DEFAULT_AGENCY_ROLE'],
+            'site_agency_tiktok_url' => $config['SITE_AGENCY_TIKTOK_URL'],
         ]);
         break;
 
     case 'db-test':
+        require_api_key();
+
         try {
-            $host = (string) env_value('DB_HOST');
-            $port = (string) env_value('DB_PORT', '3306');
-            $name = (string) env_value('DB_NAME');
-            $user = (string) env_value('DB_USER');
-            $pass = (string) env_value('DB_PASS');
+            $config = config_payload();
 
             $dsn = sprintf(
                 'mysql:host=%s;port=%s;dbname=%s;charset=utf8mb4',
-                $host,
-                $port,
-                $name
+                $config['DB_HOST'],
+                $config['DB_PORT'],
+                $config['DB_NAME']
             );
 
-            $pdo = new PDO($dsn, $user, $pass, [
+            $pdo = new PDO($dsn, $config['DB_USER'], $config['DB_PASS'], [
                 PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
                 PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
                 PDO::ATTR_EMULATE_PREPARES => false,
