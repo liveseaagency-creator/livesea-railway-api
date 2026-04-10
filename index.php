@@ -3,6 +3,9 @@
 declare(strict_types=1);
 
 header('Content-Type: application/json; charset=utf-8');
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('X-Content-Type-Options: nosniff');
 
 function env_value(string $key, mixed $default = null): mixed
 {
@@ -22,22 +25,53 @@ function json_response(array $data, int $status = 200): void
     exit;
 }
 
+function get_authorization_header(): string
+{
+    if (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
+        return (string) $_SERVER['HTTP_AUTHORIZATION'];
+    }
+
+    if (!empty($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+        return (string) $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+    }
+
+    if (function_exists('apache_request_headers')) {
+        $headers = apache_request_headers();
+        foreach ($headers as $name => $value) {
+            if (strtolower((string) $name) === 'authorization') {
+                return (string) $value;
+            }
+        }
+    }
+
+    return '';
+}
+
 function require_api_key(): void
 {
     $expected = (string) env_value('INTERNAL_API_KEY', '');
-    $header   = $_SERVER['HTTP_AUTHORIZATION'] ?? '';
+    $header   = get_authorization_header();
 
     if ($expected === '') {
         json_response([
             'ok' => false,
-            'error' => 'INTERNAL_API_KEY manquante sur Railway'
+            'error' => 'INTERNAL_API_KEY manquante sur Railway',
         ], 500);
     }
 
-    if ($header !== 'Bearer ' . $expected) {
+    if (!preg_match('/^Bearer\s+(.+)$/i', $header, $matches)) {
         json_response([
             'ok' => false,
-            'error' => 'Unauthorized'
+            'error' => 'Unauthorized',
+        ], 401);
+    }
+
+    $provided = trim((string) $matches[1]);
+
+    if (!hash_equals($expected, $provided)) {
+        json_response([
+            'ok' => false,
+            'error' => 'Unauthorized',
         ], 401);
     }
 }
@@ -61,7 +95,10 @@ function config_payload(): array
         'DISCORD_GUILD_ID' => (string) env_value('DISCORD_GUILD_ID'),
         'DISCORD_REQUIRED_ROLE_ID' => (string) env_value('DISCORD_REQUIRED_ROLE_ID'),
 
-        'TIKMV_USER_LOOKUP_URL' => (string) env_value('TIKMV_USER_LOOKUP_URL', 'https://www.tikwm.com/api/user/info?unique_id=@%s'),
+        'TIKMV_USER_LOOKUP_URL' => (string) env_value(
+            'TIKMV_USER_LOOKUP_URL',
+            'https://www.tikwm.com/api/user/info?unique_id=@%s'
+        ),
         'TIKMV_HTTP_TIMEOUT' => (string) env_value('TIKMV_HTTP_TIMEOUT', '20'),
 
         'SITE_NAME' => (string) env_value('SITE_NAME', 'LiveSea Agency'),
@@ -71,7 +108,10 @@ function config_payload(): array
         'SITE_DEFAULT_MANAGER_DISCORD' => (string) env_value('SITE_DEFAULT_MANAGER_DISCORD', '@livesea.support'),
         'SITE_DEFAULT_SUPPORT_DELAY' => (string) env_value('SITE_DEFAULT_SUPPORT_DELAY', 'Réponse sous 24h à 48h'),
         'SITE_DEFAULT_AGENCY_ROLE' => (string) env_value('SITE_DEFAULT_AGENCY_ROLE', 'Créateur TikTok LIVE'),
-        'SITE_AGENCY_TIKTOK_URL' => (string) env_value('SITE_AGENCY_TIKTOK_URL', 'https://www.tiktok.com/t/ZMhfUEPPT/')
+        'SITE_AGENCY_TIKTOK_URL' => (string) env_value(
+            'SITE_AGENCY_TIKTOK_URL',
+            'https://www.tiktok.com/t/ZMhfUEPPT/'
+        ),
     ];
 }
 
@@ -89,6 +129,7 @@ switch ($action) {
 
     case 'config':
         require_api_key();
+
         json_response([
             'ok' => true,
             'config' => config_payload(),
@@ -97,6 +138,7 @@ switch ($action) {
 
     case 'site-info':
         require_api_key();
+
         $config = config_payload();
 
         json_response([
@@ -150,6 +192,6 @@ switch ($action) {
     default:
         json_response([
             'ok' => false,
-            'error' => 'Action inconnue'
+            'error' => 'Action inconnue',
         ], 404);
 }
