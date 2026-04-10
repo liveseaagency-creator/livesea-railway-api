@@ -7,9 +7,20 @@ header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
 header('Pragma: no-cache');
 header('X-Content-Type-Options: nosniff');
 
-function env_value(string $key, mixed $default = null): mixed
+function env_value($key, $default = null)
 {
-    $value = $_ENV[$key] ?? $_SERVER[$key] ?? getenv($key);
+    $value = isset($_ENV[$key]) ? $_ENV[$key] : null;
+
+    if ($value === null && isset($_SERVER[$key])) {
+        $value = $_SERVER[$key];
+    }
+
+    if ($value === null) {
+        $env = getenv($key);
+        if ($env !== false) {
+            $value = $env;
+        }
+    }
 
     if ($value === false || $value === null || $value === '') {
         return $default;
@@ -18,14 +29,14 @@ function env_value(string $key, mixed $default = null): mixed
     return $value;
 }
 
-function json_response(array $data, int $status = 200): void
+function json_response(array $data, $status = 200)
 {
-    http_response_code($status);
+    http_response_code((int) $status);
     echo json_encode($data, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     exit;
 }
 
-function get_authorization_header(): string
+function get_authorization_header()
 {
     if (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
         return (string) $_SERVER['HTTP_AUTHORIZATION'];
@@ -47,10 +58,10 @@ function get_authorization_header(): string
     return '';
 }
 
-function require_api_key(): void
+function require_api_key()
 {
     $expected = (string) env_value('INTERNAL_API_KEY', '');
-    $header   = get_authorization_header();
+    $header = get_authorization_header();
 
     if ($expected === '') {
         json_response([
@@ -76,7 +87,7 @@ function require_api_key(): void
     }
 }
 
-function config_payload(): array
+function config_payload()
 {
     return [
         'APP_ENV' => (string) env_value('APP_ENV', 'production'),
@@ -95,10 +106,7 @@ function config_payload(): array
         'DISCORD_GUILD_ID' => (string) env_value('DISCORD_GUILD_ID'),
         'DISCORD_REQUIRED_ROLE_ID' => (string) env_value('DISCORD_REQUIRED_ROLE_ID'),
 
-        'TIKMV_USER_LOOKUP_URL' => (string) env_value(
-            'TIKMV_USER_LOOKUP_URL',
-            'https://www.tikwm.com/api/user/info?unique_id=@%s'
-        ),
+        'TIKMV_USER_LOOKUP_URL' => (string) env_value('TIKMV_USER_LOOKUP_URL', 'https://www.tikwm.com/api/user/info?unique_id=@%s'),
         'TIKMV_HTTP_TIMEOUT' => (string) env_value('TIKMV_HTTP_TIMEOUT', '20'),
 
         'SITE_NAME' => (string) env_value('SITE_NAME', 'LiveSea Agency'),
@@ -108,14 +116,11 @@ function config_payload(): array
         'SITE_DEFAULT_MANAGER_DISCORD' => (string) env_value('SITE_DEFAULT_MANAGER_DISCORD', '@livesea.support'),
         'SITE_DEFAULT_SUPPORT_DELAY' => (string) env_value('SITE_DEFAULT_SUPPORT_DELAY', 'Réponse sous 24h à 48h'),
         'SITE_DEFAULT_AGENCY_ROLE' => (string) env_value('SITE_DEFAULT_AGENCY_ROLE', 'Créateur TikTok LIVE'),
-        'SITE_AGENCY_TIKTOK_URL' => (string) env_value(
-            'SITE_AGENCY_TIKTOK_URL',
-            'https://www.tiktok.com/t/ZMhfUEPPT/'
-        ),
+        'SITE_AGENCY_TIKTOK_URL' => (string) env_value('SITE_AGENCY_TIKTOK_URL', 'https://www.tiktok.com/t/ZMhfUEPPT/'),
     ];
 }
 
-$action = $_GET['action'] ?? 'ping';
+$action = isset($_GET['action']) ? $_GET['action'] : 'ping';
 
 switch ($action) {
     case 'ping':
@@ -129,7 +134,6 @@ switch ($action) {
 
     case 'config':
         require_api_key();
-
         json_response([
             'ok' => true,
             'config' => config_payload(),
@@ -138,7 +142,6 @@ switch ($action) {
 
     case 'site-info':
         require_api_key();
-
         $config = config_payload();
 
         json_response([
